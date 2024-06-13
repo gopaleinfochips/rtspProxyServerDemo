@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RTSP Stream Control</title>
+    <link href="https://vjs.zencdn.net/7.14.3/video-js.css" rel="stylesheet">
+</head>
+<body>
+    <video id="my_video" class="video-js vjs-default-skin" controls preload="auto" width="640" height="480">
+        <source src="https://your-webrtc-stream-url" type="application/x-mpegURL">
+    </video>
+
+    <button id="pauseButton">Pause</button>
+    <button id="playButton">Play</button>
+
+    <script src="https://vjs.zencdn.net/7.14.3/video.js"></script>
+    <script>
+        var player = videojs('my_video');
+
+        document.getElementById('pauseButton').addEventListener('click', function() {
+            player.pause();
+        });
+
+        document.getElementById('playButton').addEventListener('click', function() {
+            player.play();
+        });
+    </script>
+</body>
+</html>

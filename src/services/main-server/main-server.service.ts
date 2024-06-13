@@ -82,11 +82,15 @@ export class MainServerService {
     rtpTimestamp = 0;
     MAX_RTP_PAYLOAD_SIZE = 1400; // Choose a size within the MTU limit (typically 1500 bytes for Ethernet)
 
-    rtspUrl = 'rtsp://admin:einfochips@123@172.25.14.76:554/0/profile2/media.smp';
+    rtspUrl = 'rtsp://admin:einfochips@123@172.25.210.249:554/0/profile2/media.smp';
     rtspClient: any;
     h264Details :Details;
 
     isTCPClientRequest : boolean = false;
+    version : string = 'RTSP/1.0'
+    activeClientSocket : net.Socket;
+    session :string;
+    keepSessionIntevalId :any;
     constructor(
         private newRtspClientService : NewrtspclientService
     ) {
@@ -97,12 +101,34 @@ export class MainServerService {
         });
         this.server = net.createServer(async (socket) => {
             const clientId = uuidv4();
+            this.activeClientSocket = socket;
             this.clients[clientId] = { socket, state: 'INIT', session: null, transport: null, rtpPort: null, rtcpPort: null };
             console.log(`Client connected: ${clientId}`);
+            this.observeRTSPConnection();
 
-            socket.on('data', (data) => {
+            socket.on('data', async (data) => {
                 console.log(`Received data from ${clientId}: ${data.toString()}`);
-                this.handleRtspRequest(clientId, data.toString());
+                if (data[0] === 0x24) { // '$' symbol in ASCII
+                    // This is an interleaved RTP/RTCP packet
+                //     const channel = data[1];
+                //     const packetLength = data.readUInt16BE(2);
+                //     const rtpRtcpPacket = data.slice(4, 4 + packetLength);
+                
+                //     console.log(`Interleaved RTP/RTCP packet received on channel ${channel} with length ${packetLength}`);
+                
+                //     if (channel === 0 || channel === 2 || channel === 4) {
+                //       this.handleRtpPacket(rtpRtcpPacket);
+                //     } else if (channel === 1 || channel === 3 || channel === 5) {
+                //       this.handleRtcpPacket(rtpRtcpPacket);
+                //     }
+                //    let rawRes = this.newRtspClientService.sendRawPacket(data);
+                //    console.log("rawRes : ", rawRes);
+                //     // this.rtspClient.socket.write(data);
+                
+
+                  } else {
+                      this.handleRtspRequest(clientId, data.toString());
+                  }
             });
 
             socket.on('end', () => {
@@ -123,84 +149,6 @@ export class MainServerService {
 
     }
 
-    // connectRtpsSocket() {
-    //     const rtspUrl = 'rtsp://admin:einfochips@123@172.25.210.249:554/0/profile2/media.smp';
-    //     // const rtspUrl = 'rtsp://admin:einfochips@123@localhost:8554/'
-    //     const parsedUrl = new URL(rtspUrl);
-
-    //     const username = decodeURIComponent(parsedUrl.username);
-    //     const password = decodeURIComponent(parsedUrl.password);
-    //     const host = parsedUrl.hostname;
-    //     const port = parsedUrl.port || 554;
-    //     console.log("host : ", host);
-    //     console.log("port : ", port);
-    //     console.log("password : ", password);
-    //     // console.log("username : ", username);
-    //     const url = `rtsp://${host}` + parsedUrl.pathname + parsedUrl.search;
-    //     // Step 1: Create an RTSPClient instance
-    //     this.rtspClient = new RTSPClient(username, password);
-    //     // Step 2: Connect to a specified URL using the client instance.
-    //     //
-    //     // "keepAlive" option is set to true by default
-    //     // "connection" option is set to "udp" by default. 
-    //     this.rtspClient.connect(url, { connection: "tcp" })
-    //         .then(async (detailsArray) => {
-    //             console.log("Connected");
-
-    //             if (detailsArray.length == 0) {
-    //                 console.log("ERROR: There are no compatible RTP payloads to save to disk");
-    //                 // exit();
-    //             }
-    //             let filename ='outputdemo'
-    //             for (let x = 0; x < detailsArray.length; x++) {
-    //                 let details = detailsArray[x];
-    //                 console.log(`Stream ${x}. Codec is`, details.codec);
-
-    //                 // Step 3: Open the output file
-    //                 if (details.codec == "H264") {
-    //                     const videoFile = fs.createWriteStream(filename + '.264');
-    //                     // Step 4: Create H264Transport passing in the client, file, and details
-    //                     // This class subscribes to the client 'data' event, looking for the video payload
-    //                     const h264 = new H264Transport(this.rtspClient, videoFile, details);
-    //                     this.h264Details = details
-    //                 }
-    //                 if (details.codec == "H265") {
-    //                     const videoFile = fs.createWriteStream(filename + '.265');
-    //                     // Step 4: Create H265Transport passing in the client, file, and details
-    //                     // This class subscribes to the client 'data' event, looking for the video payload
-    //                     const h265 = new H265Transport(this.rtspClient, videoFile, details);
-    //                 }
-    //                 if (details.codec == "AAC") {
-    //                     const audioFile = fs.createWriteStream(filename + '.aac');
-    //                     // Add AAC Transport
-    //                     // This class subscribes to the client 'data' event, looking for the audio payload
-    //                     const aac = new AACTransport(this.rtspClient, audioFile, details);
-    //                 }
-    //             }
-
-    //             // Step 5: Start streaming!
-    //             await  this.rtspClient.play();
-    //             console.log("Play sent");
-
-    //         })
-    //         .catch(e => console.log(e));
-    //     // this.rtspClient.on("data", (channel, data, packet) => {
-    //     //     console.log("RTP:", "Channel=" + channel, "TYPE=" + packet.payloadType, "ID=" + packet.id, "TS=" + packet.timestamp, "M=" + packet.marker);
-    //     // });
-
-    //     // // The "controlData" event is fired for every RTCP packet.
-    //     // this.rtspClient.on("controlData", (channel, rtcpPacket) => {
-    //     //     console.log("RTCP:", "Channel=" + channel, "TS=" + rtcpPacket.timestamp, "PT=" + rtcpPacket.packetType);
-    //     // });
-
-    //     // The "log" event allows you to optionally log any output from the library.
-    //     // You can hook this into your own logging system super easily.
-
-    //     this.rtspClient.on("log", (data, prefix) => {
-    //         console.log(prefix + ": " + data);
-    //     });
-    // }
-
     async handleRtspRequest(clientId, request) {
         const client = this.clients[clientId];
         const socket = client.socket;
@@ -212,8 +160,6 @@ export class MainServerService {
 
         console.log("-----request main:----- ", request)
 
-
-
         if (method === 'OPTIONS') {
             const response = [
                 `${version} 200 OK`,
@@ -223,20 +169,18 @@ export class MainServerService {
                 ''
             ].join('\r\n');
             this.rtspClient =  await this.newRtspClientService.connect(this.rtspUrl);
-            console.log("rtspClient : ", this.rtspClient );
-
             let optionResponse = await this.newRtspClientService.sendOption();
             console.log("optionResponse : ",  optionResponse);
             console.log(`Sending OPTIONS response to ${clientId} ===`, response);
             socket.write(response);
         } else if (method === 'DESCRIBE') {
            
-            let describeRes = await this.newRtspClientService.sendDescribe();
+            let describeRes :any = await this.newRtspClientService.sendDescribe();
             console.log("describeRes : ",  describeRes);
-            
             let sepDescribeRes =  this.parseRTSPResponse(describeRes);
 
             console.log("sepDescribeRes: ", sepDescribeRes)
+           
             let response = [
                 `${version} 200 OK`,
                 `CSeq: ${headers['CSeq']}`,
@@ -260,40 +204,17 @@ export class MainServerService {
             // console.log("setupRequest : ", setupRequest);
             if (transport.includes('RTP/AVP/TCP')) {
                 this.isTCPClientRequest = true;
-                // const interleaved = transport.match(/interleaved=(\d+)-(\d+)/);
-                // const rtpChannel = parseInt(interleaved[1], 10);
-                // const rtcpChannel = parseInt(interleaved[2], 10);
-    
-                // client.tcpChannels = { rtpChannel, rtcpChannel };
-                // client.transport = transport;
-    
-                // const session = uuidv4();
-                // client.session = session;
-    
-                // // const response = [
-                // //     `${version} 200 OK`,
-                // //     `CSeq: ${headers['CSeq']}`,
-                // //     `Transport: RTP/AVP/TCP;interleaved=${rtpChannel}-${rtcpChannel}`,
-                // //     `Session: ${session}`,
-                // //     '',
-                // //     ''
-                // // ].join('\r\n');
 
-                let setupRes =  await this.newRtspClientService.sendSetup(uri, transport, headers?.Session)
-                console.log("setupRes : ", setupRes);
-
+                let setupRes :any =  await this.newRtspClientService.sendSetup(uri, transport, headers?.Session)
                 let setupResParsed =  this.parseRTSPResponse(setupRes);
     
-                console.log("sepDescribeRes: ", setupResParsed)
+                console.log("setupRes ---------: ", setupResParsed)
 
                 let response = [
                     `${version} 200 OK`,
                     `CSeq: ${headers['CSeq']}`,
                     'Content-Base: rtsp://localhost:8554/',
                     `Cache-Control: ${setupResParsed.headers['Cache-Control']}`,
-                    // `Content-Base:  ${setupResParsed.headers['Content-Base']}`,
-                    // `Content-Type:  ${setupResParsed.headers['Content-Type']}`,
-                    // `Content-Length: ${setupResParsed.headers['Content-Length']}`,
                     `Transport: ${setupResParsed.headers['Transport']}`,
                     `Session: ${setupResParsed.headers['Session']}`,
                     '',
@@ -332,17 +253,11 @@ export class MainServerService {
                 socket.write(response);
                 return;
             }
-            // const response = [
-            //     `${version} 200 OK`,
-            //     `CSeq: ${headers['CSeq']}`,
-            //     'Range: npt=0.000-',
-            //     `RTP-Info: url=rtsp://localhost:8554/track1;seq=0;rtptime=0`,
-            //     '',
-            //     ''
-            // ].join('\r\n');
-            let playRes =  await this.newRtspClientService.sendPlay(uri, headers?.Session, headers?.Range )
+            this.session = headers?.Session;
+            let playurl = uri.replace('rtsp://localhost:8554/', this.newRtspClientService.path);
+            console.log("playurl : ", playurl)
+            let playRes :any =  await this.newRtspClientService.sendPlay(playurl, headers?.Session, headers?.Range )
             console.log("playRes : ", playRes);
-
             let playResParsed =  this.parseRTSPResponse(playRes);
 
             console.log("playResParsed: ", playResParsed)
@@ -350,12 +265,8 @@ export class MainServerService {
             let response = [
                 `${version} 200 OK`,
                 `CSeq: ${headers['CSeq']}`,
-                'Content-Base: rtsp://localhost:8554/',
+                'Content-Base: rtsp://localhost:8554',
                 `Cache-Control: ${playResParsed.headers['Cache-Control']}`,
-                // `Content-Base:  ${setupResParsed.headers['Content-Base']}`,
-                // `Content-Type:  ${setupResParsed.headers['Content-Type']}`,
-                // // `Content-Length: ${setupResParsed.headers['Content-Length']}`,
-                // `Transport: ${setupResParsed.headers['Transport']}`,
                 `Session: ${playResParsed.headers['Session']}`,
                 `RTP-Info: ${playResParsed.headers['RTP-Info']}`,
                 '',
@@ -364,11 +275,8 @@ export class MainServerService {
             console.log("response : ", response);
             
             console.log(`Sending PLAY response to ${clientId}`);
-            // let playRes  = await this.newRtspClientService.sendPlay()
             socket.write(response);
             client.state = 'PLAYING';
-            // this.connectRtpsSocket();
-            // this.streamMediaFile(clientId, 'samplevideo.mp4');
             this.startDataOn(clientId)
         } else if (method === 'TEARDOWN') {
             const response = [
@@ -379,25 +287,26 @@ export class MainServerService {
                 ''
             ].join('\r\n');
             console.log(`Sending TEARDOWN response to ${clientId}`);
+            await this.newRtspClientService.sendTeardown();
             socket.write(response);
             client.socket.end();
         } else {
-            const response = `${version} 501 Not Implemented\r\nCSeq: ${headers['CSeq']}\r\n\r\n`;
-            console.log(`Sending error response to ${clientId}: 501 Not Implemented`);
-            socket.write(response);
+            // const response = `${version} 501 Not Implemented\r\nCSeq: ${headers['CSeq']}\r\n\r\n`;
+            // console.log(`Sending error response to ${clientId}: 501 Not Implemented`);
+            // socket.write(response);
         }
     }
 
     startDataOn(clientId) {
         const client = this.clients[clientId];
-        console.log("client : ", client );
         // const stream = fs.createReadStream(filePath, { highWaterMark: MAX_RTP_PAYLOAD_SIZE });
     
         let frameEnd = false; // Indicates the end of a frame (needs logic to determine actual end)
         this.rtspClient.on('data', (chunk) => {
+            console.log('received data from camera');
             // if (client.tcpChannels) {
                 // Interleave RTP packet with the RTP channel ID
-               console.log("chunk : ", chunk);
+            //    console.log("chunk : ", chunk);
                 client.socket.write(chunk);
             // } else if (client.rtpPort) {
             //     rtpServer.send(rtpPacket, 0, rtpPacket.length, client.rtpPort, 'localhost', (err) => {
@@ -405,16 +314,30 @@ export class MainServerService {
             //     });
             // }
         });
+        this.keepSessionAlive();
+        setTimeout(()=>{
+            this.pause();
+        }, 3000)
     
-        this.rtspClient.on('end', () => {
-            console.log(`Finished streaming media file to ${clientId}`);
-        });
-    
-        this.rtspClient.on('error', (err) => {
-            console.error(`Error streaming media file to ${clientId}: ${err.message}`);
-        });
     }
 
+  async pause(){
+    console.log(".................pause......................................")
+       let pauseRes =  await this.newRtspClientService.sendPause(this.newRtspClientService.path, this.session); 
+        console.log('pauseRes : ', pauseRes);
+        setTimeout(async () => {
+            console.log(".......................play...........................")
+            let playRes :any =  await this.newRtspClientService.sendPlay(this.newRtspClientService.path,this.session, '0.00 -' )
+            console.log("playRes : ", playRes);
+          }, 5000);
+    }
+
+    keepSessionAlive(){
+      this.keepSessionIntevalId =  setInterval(async ()=>{ 
+            let optionResponse = await this.newRtspClientService.sendOption();
+            console.log("optionResponse : ",  optionResponse);
+        }, 50000 );
+    }
     parseHeaders(headerLines) {
         const headers = {};
         headerLines.forEach(line => {
@@ -426,8 +349,58 @@ export class MainServerService {
         return headers;
     }
 
+    observeRTSPConnection(){
+       
+        this.newRtspClientService.connectionStatus$.subscribe(data =>{
+            console.log("observer data : ", data);
+            if(data.type == 'error'){
+                const response = [
+                    `${this.version} 500 Internal Server Error`,
+                    '',
+                    '',
+                    ''
+                ].join('\r\n');
+                try{
+                    this.activeClientSocket.write(response);
+                }catch(err){
+                    console.log("end")
+                }
+            
+                 this.clearInterval();
+            
+            }
+            if(data.type == 'close'){
+                this.clearInterval();
+                const response = [
+                    `${this.version} 500 Internal Server Error`,
+                    '',
+                    '',
+                    ''
+                ].join('\r\n');
+                this.activeClientSocket.write(response);
+            }
+        })
+    }
 
-
+    clearInterval(){
+        if(this.keepSessionIntevalId){
+            clearInterval(this.keepSessionIntevalId);
+            this.keepSessionIntevalId = '';
+        }
+    }
+     handleRtpPacket(packet) {
+        // Process RTP packet
+        console.log('Handling RTP packet:', packet);
+        let rtpPacketParsed  = parseRTPPacket(packet);
+        console.log('--- rtpPacketParsed:', rtpPacketParsed);
+      }
+      
+     handleRtcpPacket(packet) {
+        // Process RTCP packet
+        console.log('Handling RTCP packet:', packet);
+        let parsedRtcpPacket = parseRTCPPacket(packet);
+        console.log("Parsed rtcp packet : ", parsedRtcpPacket)
+      }
 
     streamMediaFile(clientId, filePath) {
         const client = this.clients[clientId];

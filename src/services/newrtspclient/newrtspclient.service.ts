@@ -18,10 +18,15 @@ import {
 import * as transform from "sdp-transform";
 import { Observable, Observer } from 'rxjs';
 
+interface observerEmitData  {
+    type : string;
+    message : string;
+    data : any;
+}
 @Injectable()
 export class NewrtspclientService {
-    private connectionObserver: Observer<string>;
-    public connectionStatus$: Observable<string>;
+    private connectionObserver: Observer<observerEmitData>;
+    public connectionStatus$: Observable<observerEmitData>;
   
     public client: net.Socket;
     public host: string;
@@ -48,10 +53,6 @@ export class NewrtspclientService {
                 this.password = decodeURIComponent(parsedUrl.password);
                 this.host = parsedUrl.hostname;
                 this.port = parseInt(parsedUrl.port) || 554;
-                console.log("host --- : ", this.host);
-                console.log("port : ", this.port);
-                console.log("password : ", this.password);
-                // console.log("username : ", username);
                 this.path = `rtsp://${this.host}` + parsedUrl.pathname + parsedUrl.search;
                 this.client = net.createConnection(this.port, this.host, async () => {
                     console.log('Connected to RTSP server');
@@ -59,13 +60,33 @@ export class NewrtspclientService {
 
                 this.client.on("error", (err) => {
                     console.error("RTSP connection error:", err);
+                    let emitData : observerEmitData = {
+                        type : 'error',
+                        message : 'RTSP connection error',
+                        data :err
+                    } 
+                    this.connectionObserver.next(emitData);
                   });
                   
                 this.client.on("close", () => {
                     console.log("RTSP connection closed");
+                    let emitData : observerEmitData = {
+                        type : 'close',
+                        message : 'RTSP connection closed',
+                        data :''
+                    } 
+                    
+                    this.connectionObserver.next(emitData);
                   });
                 resolve(this.client);
             } catch (err) {
+                console.error("RTSP connection error:", err);
+                let emitData : observerEmitData = {
+                    type : 'error',
+                    message : 'RTSP connection error',
+                    data :err
+                } 
+                this.connectionObserver.next(emitData);
                 reject(err);
             }
         })
@@ -101,10 +122,30 @@ export class NewrtspclientService {
         //   console.log("DESCRIBE response:", response)
     }
 
-    async sendTeardown(streamurl){
-        return await this.sendRtspCommand(this.client, "TEARDOWN", streamurl, {
+    async sendPause(streamurl, session){
+        return await this.sendRtspCommand(this.client, "PAUSE",streamurl , {
+            Accept: "application/sdp",
+            Session: session,
+          });
+        //   console.log("DESCRIBE response:", response)
+    }
+    async sendTeardown(){
+        return await this.sendRtspCommand(this.client, "TEARDOWN", this.path, {
             Accept: "application/sdp",
           });
+        //   console.log("DESCRIBE response:", response)
+    }
+    async sendRawPacket(data){
+        return new Promise((resolve, reject) => {
+             this.client.write(data), async (err) => {
+              this.client.once("data", async (data) => {
+                resolve(data.toString())
+            });
+            if(err){
+                reject(err);
+            }
+        }
+    });
         //   console.log("DESCRIBE response:", response)
     }
 
